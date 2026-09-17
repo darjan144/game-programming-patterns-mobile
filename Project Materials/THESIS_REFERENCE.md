@@ -1,10 +1,56 @@
 # Reference: Design & Architectural Patterns in Mobile Games
 
-Working reference document for a *diplomski rad* (final thesis) on **mandatory design & architectural patterns in mobile games**. Source material: this repository (a Unity implementation of the patterns from Robert Nystrom's *Game Programming Patterns*, [gameprogrammingpatterns.com](http://gameprogrammingpatterns.com)), evaluated specifically for relevance to **mobile** game development (touch input, battery/thermal limits, constrained memory, GC-managed runtimes, app-store distribution, live-ops/F2P models, device fragmentation).
+Working reference document for a *diplomski rad* (final thesis) on **design and architectural patterns in mobile game development**. The thesis is **engine-agnostic** — it covers patterns as they apply to mobile game development in general, not tied to any specific game engine. Unity serves as the platform for concrete implementation examples, performance analysis, and practical recommendations, but it is a **means of demonstration, not the subject** of the work. Source material: Robert Nystrom's *Game Programming Patterns* ([gameprogrammingpatterns.com](http://gameprogrammingpatterns.com)), evaluated specifically for relevance to **mobile** game development (touch input, battery/thermal limits, constrained memory, GC-managed runtimes, app-store distribution, live-ops/F2P models, device fragmentation).
 
 Each of the book's 23 patterns is placed into one of three tiers by how load-bearing it is for a typical mobile game's architecture. A fourth section extends beyond the book to patterns that are effectively mandatory in professional mobile projects but aren't covered by *Game Programming Patterns*. Code pointers reference files already implemented in this repo under [Assets/Patterns/](Assets/Patterns) and explanatory notes under [_text/](_text).
 
 > Working thesis structure suggestion: use Tier 1 as the "core pattern" chapter, Tier 2 as "genre/scale-dependent patterns," Tier 3 as "patterns with limited mobile applicability" (useful as a *contrast* — showing you understand why some GPP patterns don't transfer to mobile), and Section 5 as "patterns beyond the book required in production mobile architectures."
+
+---
+
+## Mentor feedback status
+
+These notes incorporate feedback received from a teaching assistant (not the official mentor, Prof. Ivetić — all final decisions on scope, structure, and content must be confirmed with Prof. Ivetić). Key directives from that feedback:
+
+1. **Engine-agnostic framing** — the thesis topic should be formulated broadly (patterns in mobile game development), with Unity as the demo/benchmark platform, not the subject.
+2. **Standardized pattern presentation format** — every pattern should follow a consistent structure (see below).
+3. **Additional patterns** to consider adding: Strategy, Factory Method, Event Bus/Message Broker, Service Locator/DI (with cost-benefit caveats).
+4. **Singleton deep-dive** — cover multiple implementation variants and the anti-pattern debate.
+5. **Practical decision framework** — a closing chapter with guidelines, tables, and a decision diagram for choosing patterns.
+6. **Optional empirical evaluation** — benchmark specific before/after comparisons on real devices.
+7. **Optional multi-device benchmark** — test on low-end, mid-range, high-end Android devices.
+
+---
+
+## Standardized pattern presentation format
+
+Every pattern in the thesis should be presented using this consistent structure (per mentor feedback). This applies to both book patterns and mobile-specific additions:
+
+1. **Problem the pattern solves** — what concrete problem motivates the pattern.
+2. **Principle of operation** — how the pattern works at a conceptual level.
+3. **Advantages and disadvantages** — pros and cons in general and in the mobile context.
+4. **Impact on performance and memory** — allocation, GC pressure, CPU cost, battery implications.
+5. **Impact on code maintainability** — modularity, testability, coupling, team scalability.
+6. **Typical use cases** — when to apply the pattern in a mobile game.
+7. **Implementation example** — concrete code example (in Unity for the demo project).
+8. **Alternatives and common mistakes** — what else could solve the same problem; frequent misuse.
+
+---
+
+## Introduction chapter guidance (per mentor feedback)
+
+The introductory chapter (Увод) should briefly explain why design patterns are especially important in mobile game development. Suggested flow:
+
+1. **General importance** — why design patterns matter in software development (modularity, scalability, maintainability, reusable solutions to recurring problems).
+2. **Mobile-specific motivation** — constraints that make patterns especially relevant on mobile:
+   - Limited memory
+   - Limited CPU/processing power
+   - Battery consumption
+   - Loading times
+   - Application size (store download limits, storage constraints)
+   - Device fragmentation (wide range of hardware capabilities)
+   - Thermal throttling
+3. **Natural transition** — this motivates the selection of patterns that the thesis analyzes in subsequent chapters.
 
 ---
 
@@ -65,6 +111,13 @@ Patterns that appear in the architecture of nearly every mobile game, regardless
 - **Mobile relevance:** extremely common in real mobile codebases (`GameManager.Instance`, `AudioManager.Instance`, `AdsManager.Instance` patterns are everywhere in shipped mobile titles and asset-store templates) — but also the most **debated** pattern in the book itself. Worth treating as "mandatory in practice, discouraged in theory" — good thesis material on the gap between textbook best practice and shipped-code reality.
 - **Code:** [_text/5-singleton.md](_text/5-singleton.md), [Assets/Patterns/5. Singleton/Scripts](Assets/Patterns/5.%20Singleton/Scripts) (`SingletonCSharp.cs` plain C#, `SingletonUnity.cs` MonoBehaviour variant with the double-instance/`OnDestroy` teardown problem called out).
 - **Thesis angle:** the source text lists concrete alternatives (no class, static class/Service Locator, dependency injection, "one singleton") — useful as a comparison table against Service Locator and DI (Section 5).
+- **Implementation variants to cover (per mentor feedback):**
+  1. **Classic Singleton** — standard `private static instance` with `public static Instance` property.
+  2. **Lazy vs. eager initialization** — lazy creates on first access (saves startup cost, risks mid-gameplay hitch); eager creates at app start (predictable timing, wastes memory if never used).
+  3. **Thread-safe implementations** — briefly, for completeness: `lock`, double-checked locking, `Lazy<T>`. Less critical in Unity's single-threaded main loop but relevant for background-thread services (analytics, save I/O).
+  4. **Unity PersistentSingleton** — `MonoBehaviour` + `DontDestroyOnLoad()` to survive scene transitions; the standard Unity pattern. Must handle the duplicate-instance problem (second instance created when returning to the originating scene).
+  5. **Scene-scoped Singleton** — lives only within one scene, destroyed on scene unload. Useful for scene-specific managers (e.g., a level-specific spawn manager) that should *not* persist globally.
+- **Anti-pattern discussion:** explain *why* Singleton is often considered an anti-pattern — hidden dependencies, global mutable state, testing difficulty, initialization order fragility — and when it remains a pragmatic choice despite these drawbacks. Present advantages and limitations of each variant.
 
 ### Service Locator
 - **Problem it solves:** global access to swappable services (audio, input, localization, analytics) without hard-coding concrete types.
@@ -118,22 +171,85 @@ These are legitimate, well-explained patterns in the book, but they solve proble
 *Game Programming Patterns* predates the current mobile F2P/live-ops era and doesn't cover UI-architecture or SDK-integration patterns that are now close to mandatory in shipped mobile games. Recommended additions for the thesis:
 
 - **MVC / MVVM / MVP** — UI-heavy mobile games (shop screens, inventory, daily rewards, battle-pass) commonly separate presentation from state using one of these; MVVM with data-binding is increasingly common with Unity UI Toolkit. Builds directly on Observer (Tier 1).
-- **Dependency Injection** (Zenject/Extenject, VContainer, or manual constructor injection) — the production alternative to Singleton/Service Locator that this repo's own Singleton text already gestures at; worth treating as the "next step" for a thesis chapter that critiques Singleton overuse.
+- **Dependency Injection** (Zenject/Extenject, VContainer, or manual constructor injection) — the production alternative to Singleton/Service Locator that this repo's own Singleton text already gestures at; worth treating as the "next step" for a thesis chapter that critiques Singleton overuse. Per mentor feedback: present carefully, with notes on evaluating whether the complexity of a DI framework is justified for a given project's scale.
 - **Adapter** — used constantly to wrap platform SDKs with incompatible interfaces (Google Play Billing vs. Apple StoreKit, GameCenter vs. Google Play Games) behind one shared interface; closely related to Facade (Tier 2) and explicitly flagged as related in [_text/22-facade.md](_text/22-facade.md).
 - **Repository / Remote Config pattern** — abstracting local save data vs. cloud save vs. server-driven remote config (A/B tests, live-ops event data) behind one data-access interface.
-- **Strategy** — swappable algorithms/behaviors (AI difficulty tiers, monetization/ad-frequency strategies, matchmaking strategies); explicitly named as a close relative of State in [_text/6-state.md](_text/6-state.md).
+- **Strategy** — swappable algorithms/behaviors (AI difficulty tiers, monetization/ad-frequency strategies, matchmaking strategies, different control schemes); explicitly named as a close relative of State in [_text/6-state.md](_text/6-state.md). *Mentor specifically recommended including this.*
 - **Builder** — used for procedural level/character/loadout construction where a Factory's single-call construction isn't expressive enough.
+- **Factory Method** (distinct from the Factory already in Tier 1) — creating families of related objects (enemies, projectiles, items, power-ups) where the concrete type is determined at runtime by subclass or configuration. *Mentor specifically recommended including this.*
+- **Event Bus / Message Broker** — an evolution of the Observer pattern for larger projects where many-to-many decoupled communication is needed without direct subscriber registration. Common in mid-to-large mobile codebases to avoid spaghetti event wiring. *Mentor specifically recommended including this.*
 - **Entity Component System (ECS) / Data-Oriented Design** — Unity DOTS/ECS is the mobile-scale evolution of the classic Component pattern (Tier 1) for games needing thousands of simulated entities under mobile CPU/battery budgets; worth pairing with the Data Locality discussion (Tier 3).
+
+---
+
+## Section 6 — Decision framework for pattern selection (per mentor feedback)
+
+After presenting all patterns, the thesis should include a dedicated closing chapter that provides **practical guidelines for choosing patterns**. This chapter significantly increases the practical value of the work. Elements to include:
+
+### Tabular decision guide
+
+A table (or set of tables) with columns like:
+
+| Problem | Recommended pattern(s) | When to avoid | Notes |
+|---|---|---|---|
+| Global manager access | Singleton, Service Locator, DI | Singleton when testability matters; DI when project is small and overhead isn't justified | See anti-pattern discussion |
+| Many short-lived objects (bullets, particles, UI elements) | Object Pool | When object count is low and allocation cost is negligible | Benchmark to verify benefit |
+| Complex screen/menu flow | State (FSM) | When there are only 2–3 states and if-else suffices | Consider hierarchical FSM for deep flows |
+| Decoupled event communication | Observer, Event Bus | Event Bus in small projects (over-engineering); Observer when too many subscribers cause debugging difficulty | ... |
+| ... | ... | ... | ... |
+
+### Pattern interaction guidelines
+
+- When Singleton is a good solution vs. when it becomes an anti-pattern.
+- When Observer brings benefit vs. when it introduces unnecessary complexity.
+- How to combine multiple patterns in real projects (e.g., Object Pool + Factory, State + Observer, Service Locator + Adapter).
+
+### Decision diagram
+
+Based on the literature and practical experience, develop a methodology for pattern selection — e.g., a **decision flowchart/tree** where the input is the problem being solved and the output is a recommended pattern (with caveats). Example flow: "Do you need global access to a service?" → "Is it swappable/testable?" → "Is the project large enough to justify DI?" → recommends Singleton / Service Locator / DI accordingly.
 
 ---
 
 ## Suggested empirical angle for the thesis
 
-Since this is an academic study rather than a pure literature review, consider pairing the classification above with small reproducible measurements using this repo's existing dual implementations:
+Since this is an academic study rather than a pure literature review, consider pairing the classification above with small reproducible measurements. The demo examples can be built as isolated scenes or packaged into a single small **hyper-casual mini game** for a more cohesive demonstration.
+
+### Core comparisons (from this repo's existing dual implementations)
 
 1. **Object Pool vs. naive Instantiate/Destroy** — [Assets/Patterns/18. Object Pool/Gun/Object pools/Simple](Assets/Patterns/18.%20Object%20Pool/Gun/Object%20pools/Simple) vs. plain `Instantiate`/`Destroy` bullets; measure frame time and `GC.Alloc` per frame on an actual Android/iOS device via the Unity Profiler. This directly substantiates the Tier 1 ranking of Object Pool.
 2. **Simple list-search pool vs. optimized linked-list pool** — [.../Simple](Assets/Patterns/18.%20Object%20Pool/Gun/Object%20pools/Simple) vs. [.../Optimized](Assets/Patterns/18.%20Object%20Pool/Gun/Object%20pools/Optimized) vs. [.../UnityNative](Assets/Patterns/18.%20Object%20Pool/Gun/Object%20pools/UnityNative) — a clean "implementation quality within the same pattern" comparison.
 3. **Singleton MonoBehaviour lifecycle bug** — reproduce the `OnDestroy`-during-quit teardown issue called out in [_text/5-singleton.md](_text/5-singleton.md) using [Assets/Patterns/5. Singleton/Scripts/SingletonUnity.cs](Assets/Patterns/5.%20Singleton/Scripts/SingletonUnity.cs) as a concrete failure-mode case study.
+
+### Additional comparisons suggested by mentor feedback
+
+4. **Enemy/object spawning:** without Object Pool vs. with Object Pool.
+5. **Resource loading:** `Resources.Load` vs. `Addressables`.
+6. **Communication:** direct references vs. Observer/Event-based decoupling.
+7. **State management:** if-else chains vs. State Machine pattern.
+
+### What to measure
+
+For each comparison, collect as many of these metrics as practical:
+
+- **FPS** (frames per second, average and 1% low)
+- **GC Alloc** (per-frame managed allocations in bytes)
+- **GC event count** (number of garbage collection pauses)
+- **Memory usage** (total and managed heap)
+- **Load time** (scene/asset loading duration)
+- **Build size** (APK/IPA size impact)
+- **CPU usage** (per-frame CPU time in ms)
+
+Present results as tables and charts for clear visual comparison. Discuss results in the context of the literature to derive concrete guidelines for pattern selection.
+
+### Optional: Multi-device benchmark
+
+Run the same benchmarks on devices with different hardware tiers to demonstrate how much each pattern actually matters across the device spectrum:
+
+- **Low-end Android** (e.g., budget device with 2–3 GB RAM, older SoC)
+- **Mid-range Android** (e.g., 4–6 GB RAM, mid-tier SoC)
+- **High-end Android** (e.g., 8+ GB RAM, flagship SoC)
+
+This would show that patterns like Object Pool provide marginal gains on high-end devices but are critical on low-end hardware — strengthening the thesis's mobile-specific argument.
 
 ---
 
